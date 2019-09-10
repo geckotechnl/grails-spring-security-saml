@@ -38,11 +38,14 @@ import groovy.lang.MissingPropertyException
 @Slf4j('logger')
 class SpringSamlUserDetailsService extends GormUserDetailsService implements SAMLUserDetailsService {
 
+    private static String USERNAME = 'username'
+
     String authorityClassName
     String authorityJoinClassName
     String authorityNameField
     Boolean samlAutoCreateActive
     Boolean samlAutoAssignAuthorities = true
+    Boolean samlCaseInsensitiveKey = false
     String samlAutoCreateKey
     Map samlUserAttributeMappings
     Map samlUserGroupToRoleMapping
@@ -121,7 +124,13 @@ class SpringSamlUserDetailsService extends GormUserDetailsService implements SAM
         samlUserAttributeMappings.each { key, value ->
             def samlValue = credential.getAttributeAsString(value)
             if (samlValue) {
-                user."$key" = samlValue
+                //rather anoying check, if you override the username here with additional mapping, it should still be lowercased...
+                if(samlCaseInsensitiveKey && key==samlAutoCreateKey) {
+                    user."$key" = samlValue.toLowerCase()
+                } else {
+                    user."$key" = samlValue
+                }
+
             }
         }
         user
@@ -191,6 +200,9 @@ class SpringSamlUserDetailsService extends GormUserDetailsService implements SAM
 
 
     private Object generateSecurityUser(username) {
+        if(samlCaseInsensitiveKey && USERNAME==samlAutoCreateKey) {
+            username = username.toLowerCase()
+        }
         userClass.newInstance( username: username, password: 'password' )
     }
 
@@ -199,7 +211,13 @@ class SpringSamlUserDetailsService extends GormUserDetailsService implements SAM
         if (userClazz && samlAutoCreateActive && samlAutoCreateKey && authorityNameField && authorityJoinClassName) {
 
             Map whereClause = [:]
-            whereClause.put "$samlAutoCreateKey".toString(), user."$samlAutoCreateKey"
+
+            //get the autoCreateKey property and lower-it if needed...
+            def value = user."$samlAutoCreateKey"
+            if((value instanceof String) && samlCaseInsensitiveKey) {
+                value = value.toLowerCase()
+            }
+            whereClause.put "$samlAutoCreateKey".toString(), value
             Class<?> joinClass = grailsApplication.getDomainClass(authorityJoinClassName)?.clazz
             logger.debug("Before With Transaction")
 

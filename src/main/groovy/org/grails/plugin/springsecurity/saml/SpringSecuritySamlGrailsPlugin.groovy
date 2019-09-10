@@ -294,6 +294,7 @@ class SpringSecuritySamlGrailsPlugin extends Plugin {
                 authorityNameField = conf.authority.nameField
                 samlAutoCreateActive = conf.saml.autoCreate.active
                 samlAutoAssignAuthorities = conf.saml.autoCreate.assignAuthorities
+                samlCaseInsensitiveKey = conf.saml.caseInsensitiveKey
                 samlAutoCreateKey = conf.saml.autoCreate.key
                 samlUserAttributeMappings = conf.saml.userAttributeMappings
                 samlUserGroupAttribute = conf.saml.userGroupAttribute
