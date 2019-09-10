@@ -79,6 +79,7 @@ grails:
                   autoCreate:
                        active: false
                        key: 'username'
+                       caseInsensitiveKey: false
                        assignAuthorities: true
                   metadata:
                        defaultIdp: 'localhost:default:entityId'

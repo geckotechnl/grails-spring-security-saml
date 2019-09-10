@@ -38,14 +38,12 @@ import groovy.lang.MissingPropertyException
 @Slf4j('logger')
 class SpringSamlUserDetailsService extends GormUserDetailsService implements SAMLUserDetailsService {
 
-    private static String USERNAME = 'username'
-
     String authorityClassName
     String authorityJoinClassName
     String authorityNameField
     Boolean samlAutoCreateActive
     Boolean samlAutoAssignAuthorities = true
-    Boolean samlCaseInsensitiveKey = false
+    Boolean samlAutoCreateCaseInsensitiveKey = false
     String samlAutoCreateKey
     Map samlUserAttributeMappings
     Map samlUserGroupToRoleMapping
@@ -64,17 +62,17 @@ class SpringSamlUserDetailsService extends GormUserDetailsService implements SAM
             if (!username) {
                 throw new UsernameNotFoundException("No username supplied in saml response.")
             }
-
             def user = generateSecurityUser(username)
-            logger.debug("Generated User ${user.username}")
+            logger.info("Generated User ${user.username}")
             user = mapAdditionalAttributes(credential, user)
             if (user) {
-                def grantedAuthorities = getAuthoritiesForUser(credential, username)
+                def grantedAuthorities = getAuthoritiesForUser(credential, user.username)
+
                 if (samlAutoCreateActive) {
                     user = saveUser(user.class, user, grantedAuthorities)
                     // load any new local DB roles
                     grantedAuthorities.addAll(
-                        determineLocalRoles( username )
+                        determineLocalRoles( user.username )
                     )
                 }
 
@@ -114,6 +112,7 @@ class SpringSamlUserDetailsService extends GormUserDetailsService implements SAM
             def value = credential.getAttributeAsString(usernameAttr)
             logger.debug("Username using attribute '${usernameAttr}': ${value}")
             return value
+
         } else {
             // if no mapping provided for username attribute then assume it is the returned subject in the assertion
             return credential.nameID?.value
@@ -124,13 +123,7 @@ class SpringSamlUserDetailsService extends GormUserDetailsService implements SAM
         samlUserAttributeMappings.each { key, value ->
             def samlValue = credential.getAttributeAsString(value)
             if (samlValue) {
-                //rather anoying check, if you override the username here with additional mapping, it should still be lowercased...
-                if(samlCaseInsensitiveKey && key==samlAutoCreateKey) {
-                    user."$key" = samlValue.toLowerCase()
-                } else {
-                    user."$key" = samlValue
-                }
-
+                user."$key" = samlValue
             }
         }
         user
@@ -144,7 +137,6 @@ class SpringSamlUserDetailsService extends GormUserDetailsService implements SAM
             authorities.addAll(
                 determineLocalRoles(username)
             )
-
         }
         authorities.addAll (
             determineSamlRoles( credential )
@@ -200,31 +192,30 @@ class SpringSamlUserDetailsService extends GormUserDetailsService implements SAM
 
 
     private Object generateSecurityUser(username) {
-        if(samlCaseInsensitiveKey && USERNAME==samlAutoCreateKey) {
-            username = username.toLowerCase()
-        }
         userClass.newInstance( username: username, password: 'password' )
     }
 
     private def saveUser(userClazz, user, authorities) {
         logger.debug("Saving User")
         if (userClazz && samlAutoCreateActive && samlAutoCreateKey && authorityNameField && authorityJoinClassName) {
-
             Map whereClause = [:]
 
             //get the autoCreateKey property and lower-it if needed...
             def value = user."$samlAutoCreateKey"
-            if((value instanceof String) && samlCaseInsensitiveKey) {
-                value = value.toLowerCase()
-            }
-            whereClause.put "$samlAutoCreateKey".toString(), value
+            String autoCreateProperty = "$samlAutoCreateKey".toString()
             Class<?> joinClass = grailsApplication.getDomainClass(authorityJoinClassName)?.clazz
             logger.debug("Before With Transaction")
-
                 logger.debug("Saving User")
                 def existingUser
                 userClazz.withTransaction {
-                    existingUser = userClazz.findWhere(whereClause)
+                    if(samlAutoCreateCaseInsensitiveKey) {
+                        existingUser = userClazz.withCriteria(uniqueResult: true) {
+                            ilike(autoCreateProperty, value)
+                        }
+                    } else {
+                        whereClause.put "$samlAutoCreateKey".toString(), value
+                        existingUser = userClazz.findWhere(whereClause)
+                    }
                 }
 
                 if (!existingUser) {
@@ -243,14 +234,11 @@ class SpringSamlUserDetailsService extends GormUserDetailsService implements SAM
                         joinClass.withTransaction {
                             joinClass.removeAll user
                         }
-
-
                     }
                     logger.debug("Now Save the User")
                     userClazz.withTransaction {
                         user.save()
                     }
-
                 }
 
                 if (samlAutoAssignAuthorities) {

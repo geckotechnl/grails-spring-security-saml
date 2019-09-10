@@ -36,7 +36,7 @@ class SpringSamlUserDetailsServiceSpec  extends Specification implements Service
         service.authorityJoinClassName = JOIN_CLASS_NAME
         service.authorityNameField = "authority"
         service.samlAutoCreateActive = false
-        service.samlCaseInsensitiveKey = false
+        service.samlAutoCreateCaseInsensitiveKey = false
         service.samlAutoCreateKey = null
         service.samlUserAttributeMappings = [username: USERNAME_ATTR_NAME]
         service.samlUserGroupAttribute = GROUP_ATTR_NAME
@@ -157,32 +157,40 @@ class SpringSamlUserDetailsServiceSpec  extends Specification implements Service
             samlUser.firstName == firstname
     }
 
-    void "loadUserBySAML should set additional mapped attributes on the user, caseInsensitive key"() {
+    void "loadUserBySAML should set additional mapped attributes on the user, username different casing"() {
         given:
-        def emailAddress = "test@mailinator.com"
+        def samlUserSaved = new TestSamlUser(username: username, password: 'test')
+        samlUserSaved.save( failOnError: true )
+        testRole.save(flush:true)
+
+        //why?
+        TestUserRole.metaClass.'static'.removeAll = { TestSamlUser userWithRoles -> }
+
+        //check the call?
+        TestUserRole.metaClass.'static'.create = { TestSamlUser userWithNoRoles, TestRole role ->
+            assert userWithNoRoles.username == username
+            assert role.authority == ROLE
+        }
+
+        def casedUsername = "JaCkSpaRroW"
+        def emailAddress = "tEsT@mAiLiNaToR.cOm"
         def firstname = "Jack"
 
         service.samlAutoCreateActive = true
+        service.samlAutoCreateCaseInsensitiveKey = true
         service.samlAutoCreateKey = 'username'
-        service.samlCaseInsensitiveKey = true
 
         service.samlUserAttributeMappings = [email: "$MAIL_ATTR_NAME", firstName: "$FIRSTNAME_ATTR_NAME"]
         setMockSamlAttributes(credential, ["$USERNAME_ATTR_NAME": username, "$MAIL_ATTR_NAME": emailAddress, "$FIRSTNAME_ATTR_NAME": firstname])
 
-        String lowerCaseUsername = username.toLowerCase()
-
         when:
         def user = service.loadUserBySAML(credential)
-        def samlUser = TestSamlUser.findByUsernameIlike(username)
+        def samlUser = TestSamlUser.findByUsername(username)
 
         then:
+        samlUser.id == samlUserSaved.id
         samlUser.email == emailAddress
         samlUser.firstName == firstname
-        samlUser.username == lowerCaseUsername
-
-        user.username == samlUser.username
-        user.email == samlUser.email
-        user.firstName == samlUser.firstName
     }
 
     void "loadUserBySAML should set additional mapped attributes on the user and pass them on to the user details"() {

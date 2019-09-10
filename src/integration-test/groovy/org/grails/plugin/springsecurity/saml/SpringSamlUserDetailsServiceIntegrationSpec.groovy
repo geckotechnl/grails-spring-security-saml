@@ -38,6 +38,7 @@ class SpringSamlUserDetailsServiceIntegrationSpec extends Specification {
             SpringSamlUserDetailsService service = new SpringSamlUserDetailsService(
                     samlAutoAssignAuthorities: false,
                     samlAutoCreateActive: true,
+                    samlAutoCreateCaseInsensitiveKey: false,
                     userDomainClassName: userDomainClassName,
                     samlAutoCreateKey: 'username',
                     authorityNameField: authorityNameField,
@@ -69,6 +70,7 @@ class SpringSamlUserDetailsServiceIntegrationSpec extends Specification {
                     samlUseLocalRoles:         true, // the key configuration param
                     samlAutoAssignAuthorities: false,
                     samlAutoCreateActive:      false,
+                    samlAutoCreateCaseInsensitiveKey:    false,
                     userDomainClassName:       userDomainClassName,
                     authorityNameField:        authorityNameField,
                     authorityJoinClassName:    authorityJoinClassName )
@@ -82,6 +84,41 @@ class SpringSamlUserDetailsServiceIntegrationSpec extends Specification {
             loadedUser.username == testUsername
             loadedUser.authorities.size() == loadedRoles.size()
             loadedUser.authorities*.authority.containsAll( loadedRoles*.authority )
+    }
+
+    def 'Test retrieval of user roles from local DB, casing '() {
+        given: 'A user with some roles and configuration to use local roles'
+        String lowercaseUserName = testUsername.toLowerCase()
+        TestSamlUser user = new TestSamlUser(
+                username: lowercaseUserName,
+                email: testEmail,
+                password: testPassword
+        ).save( failOnError: true )
+        ['role1', 'role2', 'role3', 'role4'].each { roleName ->
+            def role = new TestRole( authority: roleName ).save( failOnError: true )
+            TestUserRole.create( user, role )
+        }
+        SpringSamlUserDetailsService service = new SpringSamlUserDetailsService(
+                samlUseLocalRoles:         true, // the key configuration param
+                samlAutoAssignAuthorities: false,
+                samlAutoCreateActive:      true,
+                samlAutoCreateCaseInsensitiveKey:    true,
+                samlAutoCreateKey: 'username',
+                userDomainClassName:       userDomainClassName,
+                authorityNameField:        authorityNameField,
+                authorityJoinClassName:    authorityJoinClassName )
+        service.grailsApplication = grailsApplication
+
+        when: 'We attempt to retrieve the user based on SAML Credentials'
+        println 'sttarttest'
+        UserDetails loadedUser = (UserDetails)service.loadUserBySAML( buildSamlCredential( testUsername ) )
+        def loadedRoles = TestSamlUser.findByUsername( lowercaseUserName ).authorities
+
+        then: 'the user is returned with roles which match their DB roles'
+        //TODO deal with this shit
+        loadedUser.username == lowercaseUserName
+        loadedUser.authorities.size() == loadedRoles.size()
+        loadedUser.authorities*.authority.containsAll( loadedRoles*.authority )
     }
 
     private static SAMLCredential buildSamlCredential(String username ) {
