@@ -198,33 +198,19 @@ class SpringSamlUserDetailsService extends GormUserDetailsService implements SAM
     private def saveUser(userClazz, user, authorities) {
         logger.debug("Saving User")
         if (userClazz && samlAutoCreateActive && samlAutoCreateKey && authorityNameField && authorityJoinClassName) {
-            Map whereClause = [:]
 
             //get the autoCreateKey property and lower-it if needed...
             def value = user."$samlAutoCreateKey"
-            String autoCreateProperty = "$samlAutoCreateKey".toString()
             Class<?> joinClass = grailsApplication.getDomainClass(authorityJoinClassName)?.clazz
             logger.debug("Before With Transaction")
                 logger.debug("Saving User")
-                def existingUser
-                userClazz.withTransaction {
-                    if(samlAutoCreateCaseInsensitiveKey) {
-                        existingUser = userClazz.withCriteria(uniqueResult: true) {
-                            ilike(autoCreateProperty, value)
-                        }
-                    } else {
-                        whereClause.put "$samlAutoCreateKey".toString(), value
-                        existingUser = userClazz.findWhere(whereClause)
-                    }
-                }
-
+                def existingUser = findExistingUser(userClazz, value)
                 if (!existingUser) {
                     logger.debug("User Doesn't Exist.....save it")
                     userClazz.withTransaction {
                         user.save(flush:true)
                         //if (!user.save()) throw new UsernameNotFoundException("Could not save user ${user}");
                     }
-
                 } else {
                     logger.debug("User Exists.....update its properties")
                     user = updateUserProperties(existingUser, user)
@@ -263,6 +249,18 @@ class SpringSamlUserDetailsService extends GormUserDetailsService implements SAM
                 }
         }
         return user
+    }
+
+    private def findExistingUser(userClazz, value) {
+        userClazz.withTransaction {
+            return userClazz.withCriteria(uniqueResult: true) {
+                if (samlAutoCreateCaseInsensitiveKey) {
+                    ilike(samlAutoCreateKey, value)
+                } else {
+                    eq(samlAutoCreateKey, value)
+                }
+            }
+        }
     }
 
     private Object updateUserProperties(existingUser, user) {
