@@ -9,18 +9,21 @@ buildscript {
     }
     dependencies {
         classpath "org.grails:grails-gradle-plugin:$grailsVersion"
-        classpath "org.jfrog.buildinfo:build-info-extractor-gradle:3.1.1"
+//        classpath "org.jfrog.buildinfo:build-info-extractor-gradle:3.1.1"
         classpath "io.spring.gradle:dependency-management-plugin:0.5.2.RELEASE"
+
+        // this is geckotech specific:
+        classpath 'com.bmuschko:gradle-nexus-plugin:2.3.1'
     }
 }
 
 plugins {
     id "io.spring.dependency-management" version "0.5.2.RELEASE"
-    id "com.jfrog.bintray" version "1.2"
-    id "com.jfrog.artifactory" version "3.1.1"
+//    id "com.jfrog.bintray" version "1.2"
+//    id "com.jfrog.artifactory" version "3.1.1"
 }
 
-version "4.0.1"
+version "4.0.1-SNAPSHOT"
 group "nl.geckotech.plugins"
 
 //apply plugin: 'maven-publish'
@@ -28,16 +31,19 @@ apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: "org.springframework.boot"
 apply plugin: "org.grails.grails-plugin"
-apply plugin: "org.grails.grails-plugin-publish"
+//apply plugin: "org.grails.grails-plugin-publish"
 apply plugin: "org.grails.grails-gsp"
-apply plugin: "com.jfrog.artifactory"
-apply plugin: "com.jfrog.bintray"
+//apply plugin: "com.jfrog.artifactory"
+//apply plugin: "com.jfrog.bintray"
 apply plugin: "io.spring.dependency-management"
 // Used for publishing to central repository, remove if not needed
 //apply from:'https://raw.githubusercontent.com/grails/grails-profile-repository/master/profiles/plugin/templates/grailsCentralPublishing.gradle'
 //apply from:'https://raw.githubusercontent.com/grails/grails-profile-repository/master/profiles/plugin/templates/bintrayPublishing.gradle'
 
-grailsPublish {
+// This is geckotech specific:
+apply plugin: 'com.bmuschko.nexus'
+
+/*grailsPublish {
     user = System.getenv("BINTRAY_USER") ?: System.getProperty("bintray.user") ?: project.hasProperty("bintrayUser") ? project.bintrayUser : ''
     key = System.getenv("BINTRAY_KEY") ?: System.getProperty("bintray.key") ?: project.hasProperty("bintrayKey") ? project.bintrayKey : ''
     websiteUrl = project.hasProperty('websiteUrl') ? project.websiteUrl : "http://grails.org/plugin/$project.name"
@@ -50,7 +56,7 @@ grailsPublish {
     desc = project.hasProperty('desc') ? project.desc : "Grails $project.name plugin"
     developers = [jeffwils:"Jeff Wilson",valentingoebel:"Valentin Goebel",irstevenson:"I Stevenson"]
 
-}
+}*/
 
 ext {
     grailsVersion = project.grailsVersion
@@ -64,10 +70,19 @@ repositories {
     mavenLocal()
     mavenCentral()
     maven { url "https://repo.grails.org/grails/core" }
+    maven { url "https://repo.grails.org/grails/plugins" }
     maven { url "https://build.shibboleth.net/nexus/content/repositories/releases"}
     maven { url "https://build.shibboleth.net/nexus/content/groups/public/"}
     maven { url "https://code.lds.org/nexus/content/groups/main-repo"}
     maven { url "http://repository.jboss.org/maven2/"}
+
+}
+
+// this is geckotech specific:
+nexus {
+    sign = false
+    repositoryUrl = "${geckotechRepoUrlReleases}"
+    snapshotRepositoryUrl = "${geckotechRepoUrlSnapshots}"
 }
 
 dependencyManagement {
@@ -144,4 +159,10 @@ jar {
     exclude 'security/sp.xml'
     exclude 'security/idp-local.xml'
     exclude 'saml/test.xml'
+}
+
+extraArchive {
+    sources = false
+    tests = true
+    javadoc = false
 }
