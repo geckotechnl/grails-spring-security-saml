@@ -342,6 +342,7 @@ class SpringSecuritySamlGrailsPlugin extends Plugin {
 
             webSSOprofileConsumer(WebSSOProfileConsumerImpl){
                 responseSkew = conf.saml.responseSkew
+                maxAuthenticationAge = conf.saml.maxAuthenticationAge?:7200
             }
 
             webSSOprofile(WebSSOProfileImpl)
