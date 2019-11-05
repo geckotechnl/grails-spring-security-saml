@@ -115,7 +115,6 @@ class SpringSamlUserDetailsServiceIntegrationSpec extends Specification {
         def loadedRoles = TestSamlUser.findByUsername( lowercaseUserName ).authorities
 
         then: 'the user is returned with roles which match their DB roles'
-        //TODO deal with this shit
         loadedUser.username == lowercaseUserName
         loadedUser.authorities.size() == loadedRoles.size()
         loadedUser.authorities*.authority.containsAll( loadedRoles*.authority )
