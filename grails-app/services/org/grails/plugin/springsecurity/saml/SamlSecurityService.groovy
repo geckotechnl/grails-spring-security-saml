@@ -13,6 +13,7 @@ import groovy.util.logging.Slf4j
 @Slf4j('logger')
 class SamlSecurityService extends SpringSecurityService {
     SpringSamlUserDetailsService userDetailsService
+
     def userCache
     static transactional = false
     def config
@@ -43,9 +44,15 @@ class SamlSecurityService extends SpringSecurityService {
         if (userDetails) {
             String className = config?.userLookup.userDomainClassName
             String userKey = config?.saml.autoCreate.key
+            Boolean caseInsensitive = config?.saml?.autoCreate?.caseInsensitiveKey
             if (className && userKey) {
                 Class<?> userClass = grailsApplication.getDomainClass(className)?.clazz
-                return userClass."findBy${userKey.capitalize()}"(userDetails."$userKey")
+                if(caseInsensitive) {
+                    return userClass."findBy${userKey.capitalize()}Ilike"(userDetails."$userKey")
+                } else {
+                    return userClass."findBy${userKey.capitalize()}"(userDetails."$userKey")
+                }
+
             }
         } else { return null}
     }
