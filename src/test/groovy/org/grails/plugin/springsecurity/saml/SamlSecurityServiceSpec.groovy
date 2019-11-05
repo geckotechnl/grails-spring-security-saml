@@ -17,7 +17,7 @@ class SamlSecurityServiceSpec extends Specification implements ServiceUnitTest<S
         mockDomain( TestSamlUser )
         grailsUser = new GrailsUser('username', 'password', true, true, true, true, [], 1)
 
-        authToken = new UsernamePasswordAuthenticationToken(grailsUser.username, null)
+        authToken = new UsernamePasswordAuthenticationToken([username:grailsUser.username], null)
         authToken.setDetails(grailsUser)
 
         SamlSecurityService.metaClass.static.isLoggedIn = { -> true }
@@ -70,11 +70,31 @@ class SamlSecurityServiceSpec extends Specification implements ServiceUnitTest<S
             !service.getCurrentUser()
     }
 
-    void "getCurrentUser should return null when autocreate active and details from session is null"() {
+    void "getCurrentUser should return user when autocreate active and details from session is null, but principal is set"() {
+        setup:
+        def fakeConfig = [
+                userLookup: [ userDomainClassName: 'test.TestSamlUser' ],
+                saml: [ autoCreate: [
+                        active: true,
+                        key: 'username' ] ] ]
+
+        service.config = fakeConfig
+        authToken.setDetails(null)
+
+        when:
+        def user = service.getCurrentUser()
+
+        then:
+        user instanceof TestSamlUser
+        user.username == grailsUser.username
+    }
+
+    void "getCurrentUser should return null when autocreate active and details and principal from session is null"() {
         setup:
             def fakeConfig = [saml: [ autoCreate: [active: true,] ] ]
 
             service.config = fakeConfig
+            authToken = new UsernamePasswordAuthenticationToken(null, null)
             authToken.setDetails(null)
 
         expect:

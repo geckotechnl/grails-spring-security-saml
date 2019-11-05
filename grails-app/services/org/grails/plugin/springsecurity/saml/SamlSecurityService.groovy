@@ -33,24 +33,31 @@ class SamlSecurityService extends SpringSecurityService {
             userDetails = null
         } else {
             userDetails = getAuthentication().details
-            if ( config?.saml.autoCreate.active ) {
-                userDetails =  getCurrentPersistedUser(userDetails)
+
+            if(!userDetails) {
+                def principal = getPrincipal()
+                userDetails = getCurrentPersistedUser(principal?.username)
+            } else {
+                if (config?.saml.autoCreate.active) {
+                    String userKey = config?.saml.autoCreate.key
+                    userDetails = getCurrentPersistedUser(userDetails."$userKey")
+                }
             }
         }
         return userDetails
     }
 
-    private Object getCurrentPersistedUser(userDetails) {
-        if (userDetails) {
+    private Object getCurrentPersistedUser(String username) {
+        if (username) {
             String className = config?.userLookup.userDomainClassName
             String userKey = config?.saml.autoCreate.key
             Boolean caseInsensitive = config?.saml?.autoCreate?.caseInsensitiveKey
             if (className && userKey) {
                 Class<?> userClass = grailsApplication.getDomainClass(className)?.clazz
                 if(caseInsensitive) {
-                    return userClass."findBy${userKey.capitalize()}Ilike"(userDetails."$userKey")
+                    return userClass."findBy${userKey.capitalize()}Ilike"(username)
                 } else {
-                    return userClass."findBy${userKey.capitalize()}"(userDetails."$userKey")
+                    return userClass."findBy${userKey.capitalize()}"(username)
                 }
 
             }
